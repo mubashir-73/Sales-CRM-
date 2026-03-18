@@ -1,5 +1,6 @@
 import hashlib
 import os
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -12,16 +13,10 @@ class KnowledgeRetriever:
     def __init__(self, kb_path: str = "./knowledge_base"):
         self.kb_path = Path(kb_path)
         
-        # Initialize ChromaDB
-        self.chroma_client = chromadb.HttpClient(
-            host=os.getenv("CHROMA_HOST", "chromadb"),
-            port=8000
-        )
-        
-        self.collection = self.chroma_client.get_or_create_collection(
-            name="revinova_knowledge",
-            metadata={"hnsw:space": "cosine"}
-        )
+        self.chroma_host = os.getenv("CHROMA_HOST", "chromadb")
+        self.chroma_port = 8000
+        self._chroma_client = None
+        self._collection = None
         
         self.ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         
@@ -31,6 +26,43 @@ class KnowledgeRetriever:
             "comparing": ["comparison", "features", "specs", "differentiation"],
             "decision_ready": ["pricing", "case_study", "testimonial", "demo"]
         }
+    
+    def _get_chroma_client(self):
+        """Lazy-initialize ChromaDB client with retry logic."""
+        if self._chroma_client is None:
+            max_retries = 5
+            for attempt in range(max_retries):
+                try:
+                    self._chroma_client = chromadb.HttpClient(
+                        host=self.chroma_host,
+                        port=self.chroma_port
+                    )
+                    # Test the connection
+                    self._chroma_client.heartbeat()
+                    print(f"Connected to ChromaDB at {self.chroma_host}:{self.chroma_port}")
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt
+                        print(f"ChromaDB connection attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        raise ValueError(
+                            f"Could not connect to ChromaDB at {self.chroma_host}:{self.chroma_port} "
+                            f"after {max_retries} attempts. Is ChromaDB running?"
+                        ) from e
+        return self._chroma_client
+    
+    @property
+    def collection(self):
+        """Lazy-initialize the ChromaDB collection."""
+        if self._collection is None:
+            client = self._get_chroma_client()
+            self._collection = client.get_or_create_collection(
+                name="revinova_knowledge",
+                metadata={"hnsw:space": "cosine"}
+            )
+        return self._collection
     
     def index_knowledge_base(self):
         """Index all knowledge base documents"""

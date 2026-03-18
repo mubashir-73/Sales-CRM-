@@ -3,12 +3,12 @@ import os
 from typing import Dict, Optional
 
 import requests
-from tools.calendly_connector import CalendlyConnector
-from tools.frappe_connector import FrappeConnector
 
 from agents.intent_classifier import IntentClassifier
 from agents.knowledge_retriever import KnowledgeRetriever
 from models.intent_state import ConversationContext, IntentStage
+from tools.calendly_connector import CalendlyConnector
+from tools.frappe_connector import FrappeConnector
 
 
 class SalesOrchestrator:
@@ -108,7 +108,17 @@ class SalesOrchestrator:
             for turn in context.conversation_history[-3:]
         ])
         
-        prompt = f"""You are Revinova's AI Sales Consultant. Your role is to guide prospects naturally through their buying journey.
+        prompt = f"""
+You are a high-performing B2B sales engineer.
+
+GOAL:
+Help the user move forward in their buying journey.
+
+RULES:
+- Be concise but insightful
+- Ask 1 smart follow-up question
+- Use retrieved knowledge when relevant
+- If uncertain, clarify instead of guessing
 
 CURRENT INTENT STAGE: {context.intent_state.stage.value}
 CONFIDENCE: {context.intent_state.confidence_score:.2f}

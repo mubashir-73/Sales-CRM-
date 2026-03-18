@@ -28,8 +28,12 @@ class ChatResponse(BaseModel):
 async def startup_event():
     """Index knowledge base on startup"""
     print("Indexing knowledge base...")
-    orchestrator.knowledge_retriever.index_knowledge_base()
-    print("Agent ready!")
+    try:
+        orchestrator.knowledge_retriever.index_knowledge_base()
+        print("Agent ready!")
+    except Exception as e:
+        print(f"WARNING: Could not index knowledge base on startup: {e}")
+        print("Agent starting without pre-indexed knowledge. Will retry on first request.")
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
@@ -51,6 +55,10 @@ async def chat(request: ChatRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 @app.get("/conversation/{conversation_id}")
 async def get_conversation(conversation_id: str):

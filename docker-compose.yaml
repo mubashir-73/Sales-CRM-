@@ -10,16 +10,30 @@ services:
       - chromadb_data:/chroma/chroma
     networks:
       - crm_prod_setup_default
-
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import requests; requests.get('http://localhost:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   sales-agent:
     build: .
     container_name: revinova-sales-agent
+    depends_on:
+      chromadb:
+        condition: service_healthy
     environment:
       - OLLAMA_HOST=http://host.docker.internal:11434
       - FRAPPE_API_KEY=${FRAPPE_API_KEY}
       - FRAPPE_API_SECRET=${FRAPPE_API_SECRET}
       - FRAPPE_SITE_URL=http://crm_prod_setup-frontend-1
       - CALENDLY_API_KEY=${CALENDLY_API_KEY}
+      - CHROMA_HOST=chromadb
     volumes:
       - ./knowledge_base:/app/knowledge_base
       - ./conversation_logs:/app/logs
@@ -29,6 +43,13 @@ services:
       - crm_prod_setup_default
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
 
 volumes:
   chromadb_data:
