@@ -1,0 +1,38 @@
+services:
+  chromadb:
+    image: chromadb/chroma:0.4.18
+    container_name: revinova-vectordb
+    command: >
+      sh -c "pip install numpy==1.26.4 && uvicorn chromadb.app:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8002:8000"
+    volumes:
+      - chromadb_data:/chroma/chroma
+    networks:
+      - crm_prod_setup_default
+
+  sales-agent:
+    build: .
+    container_name: revinova-sales-agent
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - FRAPPE_API_KEY=${FRAPPE_API_KEY}
+      - FRAPPE_API_SECRET=${FRAPPE_API_SECRET}
+      - FRAPPE_SITE_URL=http://crm_prod_setup-frontend-1
+      - CALENDLY_API_KEY=${CALENDLY_API_KEY}
+    volumes:
+      - ./knowledge_base:/app/knowledge_base
+      - ./conversation_logs:/app/logs
+    ports:
+      - "8001:8000"
+    networks:
+      - crm_prod_setup_default
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  chromadb_data:
+
+networks:
+  crm_prod_setup_default:
+    external: true
